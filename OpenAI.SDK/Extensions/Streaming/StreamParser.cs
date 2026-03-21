@@ -30,8 +30,9 @@ public static class StreamParser
         using var stream = await response.Content.ReadAsStreamAsync();
 #endif
         using var reader = new StreamReader(stream);
+        var dataLines = new List<string>();
 
-        while (!reader.EndOfStream)
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -41,49 +42,49 @@ public static class StreamParser
             var line = await reader.ReadLineAsync();
 #endif
 
-            // Skip empty lines
+            if (line == null)
+            {
+                if (TryDeserializeEventBlock<TEvent>(dataLines, options, out var evt, out var shouldStop) && evt != null)
+                {
+                    yield return evt;
+                }
+
+                if (shouldStop)
+                {
+                    yield break;
+                }
+
+                yield break;
+            }
+
             if (string.IsNullOrEmpty(line))
+            {
+                if (TryDeserializeEventBlock<TEvent>(dataLines, options, out var evt, out var shouldStop) && evt != null)
+                {
+                    yield return evt;
+                }
+
+                if (shouldStop)
+                {
+                    yield break;
+                }
+
+                continue;
+            }
+
+            if (line.StartsWith(":", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            // Skip event type lines (we use the type property in the JSON)
             if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            // Process data lines
             if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
             {
-                var data = line.Substring(5).TrimStart();
-
-                // Check for stream termination
-                if (data == "[DONE]")
-                {
-                    yield break;
-                }
-
-                TEvent? evt;
-                try
-                {
-                    evt = JsonSerializer.Deserialize<TEvent>(data, options);
-                }
-                catch (JsonException)
-                {
-                    // If the data is incomplete, try reading more
-#if NET7_0_OR_GREATER
-                    data += await reader.ReadToEndAsync(cancellationToken);
-#else
-                    data += await reader.ReadToEndAsync();
-#endif
-                    evt = JsonSerializer.Deserialize<TEvent>(data, options);
-                }
-
-                if (evt != null)
-                {
-                    yield return evt;
-                }
+                dataLines.Add(line.Substring(5).TrimStart());
             }
         }
     }
@@ -108,5 +109,37 @@ public static class StreamParser
         {
             yield return (evt, statusCode);
         }
+    }
+
+    private static bool TryDeserializeEventBlock<TEvent>(List<string> dataLines, JsonSerializerOptions? options, out TEvent? evt, out bool shouldStop)
+        where TEvent : IStreamEvent
+    {
+        evt = default;
+        shouldStop = false;
+
+        if (dataLines.Count == 0)
+        {
+            return false;
+        }
+
+        var data = string.Join("\n", dataLines);
+        dataLines.Clear();
+
+        if (data == "[DONE]")
+        {
+            shouldStop = true;
+            return false;
+        }
+
+        try
+        {
+            evt = JsonSerializer.Deserialize<TEvent>(data, options);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return evt != null;
     }
 }

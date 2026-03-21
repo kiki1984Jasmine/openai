@@ -189,13 +189,6 @@ public class Response : ResponseBase, IDefaultResult<Response>
     public int? TopLogprobs { get; set; }
 
     /// <summary>
-    ///     An error object returned when the model fails to generate a Response.
-    ///     This is specific to the Responses API.
-    /// </summary>
-    [JsonPropertyName("error")]
-    public ResponsesApiError? Error { get; set; }
-
-    /// <summary>
     ///     Whether to run the model response in the background.
     ///     <see href="https://platform.openai.com/docs/guides/background">Learn more</see>.
     /// </summary>

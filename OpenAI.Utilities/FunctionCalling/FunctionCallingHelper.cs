@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Schema;
 #endif
 using Betalgo.Ranul.OpenAI.Builders;
+using Betalgo.Ranul.OpenAI.Contracts.Types.Items;
 using Betalgo.Ranul.OpenAI.Contracts.Types.Tools;
 using Betalgo.Ranul.OpenAI.ObjectModels.RequestModels;
 using Betalgo.Ranul.OpenAI.ObjectModels.SharedModels;
@@ -233,6 +234,48 @@ public static class FunctionCallingHelper
     {
         var funcDef = GetFunctionDefinition(methodInfo);
         return ConvertToFunctionTool(funcDef);
+    }
+
+    /// <summary>
+    ///     Calls the function on the provided object using a Responses API <see cref="FunctionToolCallItem" />.
+    ///     This reuses the same reflection and argument parsing path as chat function calling.
+    /// </summary>
+    /// <param name="functionToolCall">The function tool call provided by the model.</param>
+    /// <param name="obj">The object with the method / function to be executed.</param>
+    /// <typeparam name="T">The return type.</typeparam>
+    public static T? CallFunction<T>(FunctionToolCallItem functionToolCall, object obj)
+    {
+        if (functionToolCall == null)
+        {
+            throw new ArgumentNullException(nameof(functionToolCall));
+        }
+
+        return CallFunction<T>(new FunctionCall
+        {
+            Name = functionToolCall.Name,
+            Arguments = functionToolCall.Arguments
+        }, obj);
+    }
+
+    /// <summary>
+    ///     Creates a Responses API <see cref="FunctionCallOutputItemParam" /> from a tool call result.
+    /// </summary>
+    /// <param name="functionToolCall">The originating function tool call.</param>
+    /// <param name="result">The execution result.</param>
+    /// <returns>A function call output item for the next Responses request.</returns>
+    public static FunctionCallOutputItemParam CreateFunctionCallOutput(FunctionToolCallItem functionToolCall, object? result)
+    {
+        if (functionToolCall == null)
+        {
+            throw new ArgumentNullException(nameof(functionToolCall));
+        }
+
+        if (string.IsNullOrWhiteSpace(functionToolCall.CallId))
+        {
+            throw new InvalidFunctionCallException("Function Call Id is null");
+        }
+
+        return new FunctionCallOutputItemParam(functionToolCall.CallId, result is string ? result : JsonSerializer.Serialize(result));
     }
 
     /// <summary>

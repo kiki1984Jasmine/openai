@@ -4,6 +4,7 @@ using Betalgo.Ranul.OpenAI.Contracts.Types.Streaming.Events;
 using Betalgo.Ranul.OpenAI.Contracts.Types.Streaming.Events.FunctionCalls;
 using Betalgo.Ranul.OpenAI.Contracts.Types.Streaming.Events.Lifecycle;
 using Betalgo.Ranul.OpenAI.Contracts.Types.Streaming.Events.Text;
+using Betalgo.Ranul.OpenAI.Contracts.Types.Streaming.Events.Tools;
 
 namespace Betalgo.Ranul.OpenAI.Extensions.Streaming;
 
@@ -304,13 +305,12 @@ public class ResponsesStreamHandler
                 break;
         }
 
-        // Check for tool call events
-        if (evt.Type.Contains(".in_progress"))
+        if (IsToolCallInProgressEvent(evt))
         {
             _toolCallInProgressHandler?.Invoke(evt);
             handled = handled || _toolCallInProgressHandler != null;
         }
-        else if (evt.Type.Contains(".completed"))
+        else if (IsToolCallCompletedEvent(evt))
         {
             _toolCallCompletedHandler?.Invoke(evt);
             handled = handled || _toolCallCompletedHandler != null;
@@ -321,5 +321,25 @@ public class ResponsesStreamHandler
         {
             _anyEventHandler?.Invoke(evt);
         }
+    }
+
+    private static bool IsToolCallInProgressEvent(IResponseStreamEvent evt)
+    {
+        return evt is ResponseCodeInterpreterCallInProgressEvent
+            or ResponseFileSearchCallInProgressEvent
+            or ResponseImageGenCallInProgressEvent
+            or ResponseMCPCallInProgressEvent
+            or ResponseMCPListToolsInProgressEvent
+            or ResponseWebSearchCallInProgressEvent;
+    }
+
+    private static bool IsToolCallCompletedEvent(IResponseStreamEvent evt)
+    {
+        return evt is ResponseCodeInterpreterCallCompletedEvent
+            or ResponseFileSearchCallCompletedEvent
+            or ResponseImageGenCallCompletedEvent
+            or ResponseMCPCallCompletedEvent
+            or ResponseMCPListToolsCompletedEvent
+            or ResponseWebSearchCallCompletedEvent;
     }
 }

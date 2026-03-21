@@ -52,8 +52,9 @@ public class RetrieveResponseRequest
     /// <summary>
     ///     Gets the query parameters string for the request.
     /// </summary>
+    /// <param name="includeStream">Whether to include the stream query parameter when present.</param>
     /// <returns>Query string or null if no parameters are set.</returns>
-    public string? GetQueryParameters()
+    public string? GetQueryParameters(bool includeStream = true)
     {
         var build = new List<string>();
 
@@ -65,7 +66,7 @@ public class RetrieveResponseRequest
             }
         }
 
-        if (Stream.HasValue)
+        if (includeStream && Stream.HasValue)
         {
             build.Add($"stream={Stream.Value.ToString().ToLowerInvariant()}");
         }

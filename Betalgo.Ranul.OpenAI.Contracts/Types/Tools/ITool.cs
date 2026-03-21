@@ -51,7 +51,7 @@ public class ToolConverter : JsonConverter<ITool>
             "local_shell" => JsonSerializer.Deserialize<LocalShellTool>(rawText, options),
             "custom" => JsonSerializer.Deserialize<CustomTool>(rawText, options),
             "apply_patch" => JsonSerializer.Deserialize<ApplyPatchTool>(rawText, options),
-            _ => JsonSerializer.Deserialize<FunctionTool>(rawText, options) // Default fallback
+            _ => new RawTool(rawText)
         };
     }
 

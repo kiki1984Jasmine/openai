@@ -14,6 +14,13 @@ public partial class OpenAIService : IResponsesService
     /// <inheritdoc />
     public async Task<Response> CreateResponse(CreateResponse createResponse, CancellationToken cancellationToken = default)
     {
+        return await CreateResponse(createResponse, modelId: null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<Response> CreateResponse(CreateResponse createResponse, string? modelId, CancellationToken cancellationToken = default)
+    {
+        createResponse.ProcessModelId(modelId, _defaultModelId);
         return await _httpClient.PostAndReadAsAsync<Response>(_endpointProvider.ResponsesCreate(), createResponse, cancellationToken);
     }
 
@@ -64,16 +71,33 @@ public partial class OpenAIService : IResponsesService
     /// <inheritdoc />
     public async Task<TokenCountsResponse> CountInputTokens(TokenCountsRequest request, CancellationToken cancellationToken = default)
     {
+        return await CountInputTokens(request, modelId: null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<TokenCountsResponse> CountInputTokens(TokenCountsRequest request, string? modelId, CancellationToken cancellationToken = default)
+    {
+        request.ProcessModelId(modelId, _defaultModelId);
         return await _httpClient.PostAndReadAsAsync<TokenCountsResponse>(_endpointProvider.ResponsesInputTokensCount(), request, cancellationToken);
     }
 
     /// <inheritdoc />
     public async IAsyncEnumerable<IResponseStreamEvent> CreateAsStreamAsync(CreateResponse createResponse, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await foreach (var evt in CreateAsStreamAsync(createResponse, modelId: null, cancellationToken))
+        {
+            yield return evt;
+        }
+    }
+
+    /// <inheritdoc />
+    public async IAsyncEnumerable<IResponseStreamEvent> CreateAsStreamAsync(CreateResponse createResponse, string? modelId, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         // Ensure streaming is enabled
         createResponse.Stream = true;
+        createResponse.ProcessModelId(modelId, _defaultModelId);
 
-        var response = await _httpClient.PostAndGetStreamAsync(_endpointProvider.ResponsesCreate(), createResponse, cancellationToken);
+        using var response = await _httpClient.PostAndGetStreamAsync(_endpointProvider.ResponsesCreate(), createResponse, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -99,13 +123,13 @@ public partial class OpenAIService : IResponsesService
             throw new ArgumentNullException(nameof(responseId));
         }
 
-        // Build query parameters with stream=true
-        var existingParams = request?.GetQueryParameters();
+        // Build query parameters with a single canonical stream=true entry.
+        var existingParams = request?.GetQueryParameters(includeStream: false);
         var queryParams = string.IsNullOrEmpty(existingParams)
             ? "stream=true"
             : $"{existingParams}&stream=true";
 
-        var response = await _httpClient.GetAndGetStreamAsync(_endpointProvider.ResponsesRetrieve(responseId, queryParams), cancellationToken);
+        using var response = await _httpClient.GetAndGetStreamAsync(_endpointProvider.ResponsesRetrieve(responseId, queryParams), cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
